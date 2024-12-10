@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 
@@ -10,8 +11,8 @@ class MergeSenario():
         self.left_hash = left_hash
         self.right_hash = right_hash
         self.merge_hash = merge_hash
-        self.left_changed_files = set()
-        self.right_changed_files = set()
+        self.left_changed_files = {"DeploymentEntityManager.java"}
+        self.right_changed_files = {"DeploymentEntityManager.java"}
 
     def merge(self):
         pass
@@ -22,7 +23,6 @@ class TestGenerator():
         self.merge_senario = merge_senario
 
     def generate_test_with_llm(self, file_path: str) -> str:
-        response = ""
         with open(file_path) as f:
             file_content = f.read()
         prompt = \
@@ -31,8 +31,10 @@ You are an expert of writing unit tests. Please write a suite of unit tests with
 
 {file_content}
 
-You should write at least 3 test cases. Please make sure that the test cases are meaningful and cover the most important aspects of the code.
-Write test code only. Make sure that the code compiles and runs without errors.
+Surround the test code with "```java```" tag.
+You should write at least 3 test cases.
+Please make sure that the test cases are meaningful and cover the most important aspects of the code.
+Make sure that the code compiles and runs without errors.
 """
         #TODO: this is for ollama
         response = requests.post(url=self.llm_config["url"] + "/api/generate",
@@ -41,7 +43,8 @@ Write test code only. Make sure that the code compiles and runs without errors.
                                     "prompt": prompt,
                                     "stream": False
                                 })).json()["response"]
-        return response
+        test_code = re.findall(r"```java(.*?)```", response, re.DOTALL)[0]
+        return test_code
 
 
     def generate(self):
@@ -57,7 +60,7 @@ Write test code only. Make sure that the code compiles and runs without errors.
         for path in left_changed_file_path + right_changed_file_path:
             test_content = self.generate_test_with_llm(path)
             # TODO: Supportted file type is only java
-            with open(path.split(".")[0] + "Test.java") as f:
+            with open(path.split(".")[0] + "Test.java", "w") as f:
                 f.write(test_content)
 
 class TestRunner():
